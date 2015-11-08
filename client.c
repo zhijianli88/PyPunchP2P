@@ -1,8 +1,4 @@
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -10,28 +6,43 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #define P2PSERVER 
 #define NAT_TYPE 1 //Restrict NAT
 #define USAGE "%s <host> <port> <pool>\n"
 #define BUFSIZE 1024
 
-int get_nat_type(const char *stun_server, int port)
+static int s; //socket
+
+static int get_nat_type(const char *stun_server, int port)
 {
 	return 1;
 }
 
+static void *recv_thread(void *arg)
+{
+	int n, zero;
+	char buf[BUFSIZE];
+	while (1) {
+		if((n = recvfrom(s, buf, BUFSIZE - 1, 0, (struct sockaddr*)0, &zero)) < 0)
+				break;
+
+		buf[n]='\0';
+		printf("%s",buf);
+	}
+}
 int main(int argc, char *argv[])
 {
 	struct sockaddr_in server;
 	struct sockaddr_in client;
 	unsigned long dst_ip;
 	int port, nat_type;
-	int s;
 	int n;
 	char buf[BUFSIZE];
 	char cmd[BUFSIZE];
 	int zero;
+	pthread_t tid;
 
 	if (argc != 4) {
 		fprintf(stderr, USAGE, argv[0]);
@@ -82,7 +93,6 @@ int main(int argc, char *argv[])
 	zero = 0;
 
 	sendto(s, buf, strlen(buf), 0, (struct sockaddr*)&server, sizeof(server));
-	//sendto(s, "1 1", 3, 0, (struct sockaddr*)&server, sizeof(server));
 	printf("send %s\n", buf);
 
 	n = recvfrom(s, buf, BUFSIZE - 1, 0, (struct sockaddr*)0, &zero);
@@ -113,18 +123,21 @@ int main(int argc, char *argv[])
 	sendto(s, buf, strlen(buf), 0, (struct sockaddr*)&server, sizeof(server));
 	printf("%s", buf);
 
+	pthread_create(&tid, NULL, recv_thread, NULL);
+
 	while ((n = read(0, buf, BUFSIZE)) > 0) {
 		buf[n]='\0';
 		sscanf(buf, "%s", cmd);
-	
+
 		if (strcmp(cmd, "quit") == 0) {
 	 		break;
 		}
-		printf("while send %s\n", buf);
+
 		if (sendto(s, buf, n, 0, (struct sockaddr*)&server, sizeof(server)) < 0) {
 			break;
 		}
 
+#if 0
 		if((n = recvfrom(s, buf, BUFSIZE - 1, 0, (struct sockaddr*)0, &zero)) < 0)
 			break;
 
@@ -132,6 +145,7 @@ int main(int argc, char *argv[])
 		printf("%s",buf);
 		printf("UDP>");
 		fflush(stdout);
+#endif
 	}
 	close(s);
 	return EXIT_SUCCESS;
