@@ -99,13 +99,54 @@ static void build_stun_request(struct stun_header *req,
 	dump_stun_header(req);
 }
 
+struct nat_addr {
+	unsigned int ip;
+	unsigned short port;
+};
+struct nat_info {
+	struct nat_addr ext;
+	struct nat_addr change;
+	struct nat_addr src;
+};
+
+static struct nat_info nat_got;
+
+static void dump_nat_info(struct nat_info *info)
+{
+	if (info->src.port)
+		printf("source addr: %d.%d.%d.%d:%d\n",
+		info->src.ip & 0xff,
+		(info->src.ip >> 8) & 0xff,
+		(info->src.ip >> 16) & 0xff,
+		(info->src.ip >> 24) & 0xff,
+		info->src.port);
+
+	if (info->ext.port)
+		printf("external addr: %d.%d.%d.%d:%d\n",
+		info->ext.ip & 0xff,
+		(info->ext.ip >> 8) & 0xff,
+		(info->ext.ip >> 16) & 0xff,
+		(info->ext.ip >> 24) & 0xff,
+		info->ext.port);
+
+	if (info->change.port)
+		printf("change addr: %d.%d.%d.%d:%d\n",
+		info->change.ip & 0xff,
+		(info->change.ip >> 8) & 0xff,
+		(info->change.ip >> 16) & 0xff,
+		(info->change.ip >> 24) & 0xff,
+		info->change.port);
+
+}
+
 /* export api */
 int get_nat_type(int sockfd, const char *stun_ip, short port,
                 char *src_ip, short src_port)
 {
     struct sockaddr_in server_addr, local_addr;
     struct stun_header request, response;
-    int n;
+    int ret, len;
+	unsigned char *attr;
 
 	// local
     bzero(&local_addr, sizeof(local_addr));
@@ -116,8 +157,8 @@ int get_nat_type(int sockfd, const char *stun_ip, short port,
     else
         local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    n = bind(sockfd,(struct sockaddr *)&local_addr,sizeof(local_addr));
-    if (n < 0) {
+    ret = bind(sockfd,(struct sockaddr *)&local_addr,sizeof(local_addr));
+    if (ret < 0) {
         printf("bind error\n");
         return -1;
     }
@@ -130,10 +171,9 @@ int get_nat_type(int sockfd, const char *stun_ip, short port,
 
 	build_stun_request(&request, BindRequestMsg, NULL, 0);
 
-	n = sendto(sockfd, &request, 20 + request.msg_len,
+	ret = sendto(sockfd, &request, 20 + request.msg_len,
 		0, (struct sockaddr *)&server_addr, sizeof(server_addr)); // send UDP
-	if (n == -1)
-	{
+	if (ret == -1) {
 		printf("sendto error\n");
 		return -1;
 	}
@@ -141,15 +181,44 @@ int get_nat_type(int sockfd, const char *stun_ip, short port,
 	usleep(1000 * 100);
 
 	//printf("Read recv ...\n");
-	n = recvfrom(sockfd, &response, 128, 0, NULL,0); // recv UDP
-	if (n == -1 || n > 128)
-	{
+	ret = recvfrom(sockfd, &response, 128, 0, NULL,0); // recv UDP
+	if (ret == -1 || ret > 128)	{
 		printf("recvfrom error\n");
 		return -2;
 	}
 
 	dump_stun_header(&response);
 
+	len = ntohs(response.msg_len);
+	attr = (unsigned char *)response.data;
+	while (len > 0) {
+		int attr_type = ntohs(*((unsigned short *)attr));
+		int attr_len = ntohs((*((unsigned short *)(attr + 2))));
+		switch (attr_type) {
+		case MappedAddress:
+			printf("attr type MappedAddress\n");
+			nat_got.ext.port = ntohs(*((unsigned short *)(attr + 6)));
+			memcpy(&nat_got.ext.ip, attr + 8, 4);
+			break;
+		case SourceAddress:
+			printf("attr type SourceAddress\n");
+			nat_got.src.port = ntohs(*((unsigned short *)(attr + 6)));
+			memcpy(&nat_got.src.ip, attr + 8, 4);
+			break;
+		case ChangedAddress:
+			printf("attr type ChangeAddress\n");
+			nat_got.change.port = ntohs(*((unsigned short *)(attr + 6)));
+			memcpy(&nat_got.change.ip, attr + 8, 4);
+			break;
+		default:
+			printf("attr type is 0x%04x\n", attr_type);
+		}
+		len -= (4 + attr_len);
+		attr += (4 + attr_len);
+		printf("remain len %d, attr_len %d\n", len, attr_len);
+	}
+
+	dump_nat_info(&nat_got);
     return 0;
 }
 
