@@ -9,48 +9,48 @@
 #include <pthread.h>
 
 char stun_servers_list[6][120] = {
-    "stun.ekiga.net",
-    "stunserver.org",
-    "stun.ideasip.com",
-    "tun.softjoys.com",
-    "tun.voipbuster.com",
+	"stun.ekiga.net",
+	"stunserver.org",
+	"stun.ideasip.com",
+	"tun.softjoys.com",
+	"tun.voipbuster.com",
 };
 
 /* NAT TYPE */
 enum {
-    BLOCKED = 0,
-    OPEN_INTERNET,
-    FULL_CONE,
-    Symmetric_UDP_FIREWALL,
-    RESTRICT_NAT,
-    RESTRICT_PORT_NAT,
-    Symmetric_NAT,
+	BLOCKED = 0,
+	OPEN_INTERNET,
+	FULL_CONE,
+	Symmetric_UDP_FIREWALL,
+	RESTRICT_NAT,
+	RESTRICT_PORT_NAT,
+	Symmetric_NAT,
 };
 
 //stun attributes
-#define MappedAddress    0x0001
-#define ResponseAddress     0x0002
-#define ChangeRequest    0x0003
-#define SourceAddress    0x0004
-#define ChangedAddress    0005
-#define Username        0x0006
-#define Password            0x0007
-#define MessageIntegrity    0x0008
-#define ErrorCode        0x0009
-#define UnknownAttribute    0x000A
-#define ReflectedFrom        0x000B
-#define XorOnly            0x0021
-#define XorMappedAddress    0x8020
-#define ServerName        0x8022
-#define SecondaryAddress    0x8050  // Non standard extention
+#define MappedAddress		0x0001
+#define ResponseAddress	 	0x0002
+#define ChangeRequest		0x0003
+#define SourceAddress		0x0004
+#define ChangedAddress		0x0005
+#define Username		0x0006
+#define Password		0x0007
+#define MessageIntegrity	0x0008
+#define ErrorCode		0x0009
+#define UnknownAttribute	0x000A
+#define ReflectedFrom		0x000B
+#define XorOnly			0x0021
+#define XorMappedAddress	0x8020
+#define ServerName		0x8022
+#define SecondaryAddress	0x8050  // Non standard extention
 
 //types for a stun message
-#define BindRequestMsg    0x0001
-#define BindResponseMsg    0x0101
-#define BindErrorResponseMsg    0x0111
-#define SharedSecretRequestMsg    0x0002
-#define SharedSecretResponseMsg    0x0102
-#define SharedSecretErrorResponseMsg    0x0112
+#define BindRequestMsg		0x0001
+#define BindResponseMsg		0x0101
+#define BindErrorResponseMsg	0x0111
+#define SharedSecretRequestMsg	0x0002
+#define SharedSecretResponseMsg	0x0102
+#define SharedSecretErrorResponseMsg	0x0112
 
 struct stun_header {
 	unsigned short type;
@@ -62,7 +62,7 @@ struct stun_header {
 
 static int stun_test(int sock, char *data)
 {
-    return -1;
+	return -1;
 }
 
 #define MAGIC 0x19880713
@@ -86,6 +86,7 @@ static void dump_stun_header(struct stun_header *header)
 		printf("0x%02x ", header->data[i]);
 	printf("\n");
 }
+
 static void build_stun_request(struct stun_header *req,
 							int type, unsigned char *msg, int msg_len)
 {
@@ -103,6 +104,7 @@ struct nat_addr {
 	unsigned int ip;
 	unsigned short port;
 };
+
 struct nat_info {
 	struct nat_addr ext;
 	struct nat_addr change;
@@ -141,33 +143,33 @@ static void dump_nat_info(struct nat_info *info)
 
 /* export api */
 int get_nat_type(int sockfd, const char *stun_ip, short port,
-                char *src_ip, short src_port)
+				char *src_ip, short src_port)
 {
-    struct sockaddr_in server_addr, local_addr;
-    struct stun_header request, response;
-    int ret, len;
+	struct sockaddr_in server_addr, local_addr;
+	struct stun_header request, response;
+	int ret, len;
 	unsigned char *attr;
 
 	// local
-    bzero(&local_addr, sizeof(local_addr));
-    local_addr.sin_family = AF_INET;
-    local_addr.sin_port = htons(src_port);
-    if (src_ip)
-        inet_pton(AF_INET, src_ip, &server_addr.sin_addr);
-    else
-        local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	bzero(&local_addr, sizeof(local_addr));
+	local_addr.sin_family = AF_INET;
+	local_addr.sin_port = htons(src_port);
+	if (src_ip)
+		inet_pton(AF_INET, src_ip, &server_addr.sin_addr);
+	else
+		local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    ret = bind(sockfd,(struct sockaddr *)&local_addr,sizeof(local_addr));
-    if (ret < 0) {
-        printf("bind error\n");
-        return -1;
-    }
+	ret = bind(sockfd,(struct sockaddr *)&local_addr,sizeof(local_addr));
+	if (ret < 0) {
+		printf("bind error\n");
+		return -1;
+	}
 
-    // fill server
-    bzero(&server_addr, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    inet_pton(AF_INET, stun_ip, &server_addr.sin_addr);
-    server_addr.sin_port = htons(port);
+	// fill server
+	bzero(&server_addr, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	inet_pton(AF_INET, stun_ip, &server_addr.sin_addr);
+	server_addr.sin_port = htons(port);
 
 	build_stun_request(&request, BindRequestMsg, NULL, 0);
 
@@ -219,7 +221,7 @@ int get_nat_type(int sockfd, const char *stun_ip, short port,
 	}
 
 	dump_nat_info(&nat_got);
-    return 0;
+	return 0;
 }
 
 int main(void)
